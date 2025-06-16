@@ -23,11 +23,11 @@ jobs:
 
       - name: Build and tag Docker image
         run: |
-          docker build -t ${{ env.FULTANG_IMAGE }} .
+          docker build -t ${{ env.MY_IMAGE }} .
 
       - name: Push to Github Packages
         run: |
-          docker push ${{ env.FULTANG_IMAGE }}
+          docker push ${{ env.MY_IMAGE }}
 
       - name: Add environment variables to .env
         run: |
