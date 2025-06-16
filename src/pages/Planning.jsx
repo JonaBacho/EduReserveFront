@@ -1,43 +1,89 @@
 import React, { useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Monitor, User, Clock } from 'lucide-react';
+import { useQuery } from 'react-query';
+import { Calendar, ChevronLeft, ChevronRight, Monitor, User, Clock, Loader, AlertCircle } from 'lucide-react';
 import { format, addDays, subDays, startOfWeek, isToday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { mockData } from '../services/api';
+import { toast } from 'react-hot-toast';
+import { 
+  planningService, 
+  creneauService, 
+  salleService, 
+  handleApiError 
+} from '../services/api';
 
 const Planning = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('day'); // 'day' ou 'week'
 
-  // Données mock pour les réservations
-  const reservations = [
+  // Charger les créneaux horaires
+  const { data: creneaux, isLoading: loadingCreneaux } = useQuery(
+    'creneaux',
+    () => creneauService.getCreneaux(),
     {
-      id: 1,
-      date: new Date(),
-      creneau: { id: 1, nom: '08:00-10:00', heure_debut: '08:00', heure_fin: '10:00' },
-      salle: { id: 1, nom: 'A101' },
-      enseignant: { first_name: 'Pierre', last_name: 'Martin' },
-      formation: { nom: 'Informatique L1' },
-      sujet: 'Cours d\'algorithmique'
-    },
-    {
-      id: 2,
-      date: new Date(),
-      creneau: { id: 2, nom: '10:15-12:15', heure_debut: '10:15', heure_fin: '12:15' },
-      salle: { id: 2, nom: 'A102' },
-      enseignant: { first_name: 'Marie', last_name: 'Durand' },
-      formation: { nom: 'Informatique L2' },
-      sujet: 'Base de données'
-    },
-    {
-      id: 3,
-      date: addDays(new Date(), 1),
-      creneau: { id: 3, nom: '13:30-15:30', heure_debut: '13:30', heure_fin: '15:30' },
-      salle: { id: 3, nom: 'B101' },
-      enseignant: { first_name: 'Jean', last_name: 'Bernard' },
-      formation: { nom: 'Mathématiques M1' },
-      sujet: 'Algèbre linéaire'
+      select: (response) => response.data.results || response.data,
+      onError: (error) => {
+        console.error('Erreur lors du chargement des créneaux:', error);
+        toast.error('Erreur lors du chargement des créneaux horaires');
+      }
     }
-  ];
+  );
+
+  // Charger les salles
+  const { data: salles, isLoading: loadingSalles } = useQuery(
+    'salles',
+    () => salleService.getSalles(),
+    {
+      select: (response) => response.data.results || response.data,
+      onError: (error) => {
+        console.error('Erreur lors du chargement des salles:', error);
+        toast.error('Erreur lors du chargement des salles');
+      }
+    }
+  );
+
+  // Charger le planning pour la date sélectionnée
+  const { data: planningData, isLoading: loadingPlanning, refetch } = useQuery(
+    ['planning', format(selectedDate, 'yyyy-MM-dd')],
+    () => planningService.getPlanningGeneral({
+      date: format(selectedDate, 'yyyy-MM-dd')
+    }),
+    {
+      select: (response) => response.data,
+      onError: (error) => {
+        console.error('Erreur lors du chargement du planning:', error);
+        const errorInfo = handleApiError(error);
+        toast.error(`Erreur planning: ${errorInfo.message}`);
+      }
+    }
+  );
+
+  // Charger le planning pour la semaine (mode semaine)
+  const weekDates = getWeekDays(selectedDate);
+  const { data: weekPlanningData, isLoading: loadingWeekPlanning } = useQuery(
+    ['week-planning', weekDates.map(d => format(d, 'yyyy-MM-dd')).join(',')],
+    async () => {
+      const planningPromises = weekDates.map(date => 
+        planningService.getPlanningGeneral({
+          date: format(date, 'yyyy-MM-dd')
+        }).then(response => ({
+          date: format(date, 'yyyy-MM-dd'),
+          data: response.data
+        }))
+      );
+      const results = await Promise.all(planningPromises);
+      return results.reduce((acc, result) => {
+        acc[result.date] = result.data;
+        return acc;
+      }, {});
+    },
+    {
+      enabled: viewMode === 'week',
+      onError: (error) => {
+        console.error('Erreur lors du chargement du planning hebdomadaire:', error);
+        toast.error('Erreur lors du chargement du planning hebdomadaire');
+      }
+    }
+  );
 
   const navigateDate = (direction) => {
     if (direction === 'prev') {
@@ -53,14 +99,65 @@ const Planning = () => {
   };
 
   const getReservationsForDate = (date) => {
-    return reservations.filter(res => isSameDay(new Date(res.date), date));
+    if (!planningData || !planningData.planning) return [];
+    
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (dateStr !== planningData.date) return [];
+    
+    // Extraire toutes les réservations de tous les créneaux
+    const allReservations = [];
+    Object.values(planningData.planning).forEach(creneauReservations => {
+      if (Array.isArray(creneauReservations)) {
+        allReservations.push(...creneauReservations);
+      }
+    });
+    
+    return allReservations;
   };
 
   const getReservationForSlot = (date, creneauId) => {
-    return reservations.find(res => 
-      isSameDay(new Date(res.date), date) && res.creneau.id === creneauId
-    );
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    if (viewMode === 'week' && weekPlanningData && weekPlanningData[dateStr]) {
+      const dayPlanning = weekPlanningData[dateStr];
+      if (dayPlanning.planning) {
+        const creneau = creneaux?.find(c => c.id === creneauId);
+        if (creneau && dayPlanning.planning[creneau.nom]) {
+          return dayPlanning.planning[creneau.nom][0]; // Prendre la première réservation
+        }
+      }
+    } else if (viewMode === 'day' && planningData && isSameDay(new Date(planningData.date), date)) {
+      if (planningData.planning) {
+        const creneau = creneaux?.find(c => c.id === creneauId);
+        if (creneau && planningData.planning[creneau.nom]) {
+          return planningData.planning[creneau.nom][0]; // Prendre la première réservation
+        }
+      }
+    }
+    
+    return null;
   };
+
+  const isLoading = loadingCreneaux || loadingSalles || 
+                   (viewMode === 'day' ? loadingPlanning : loadingWeekPlanning);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader className="w-8 h-8 animate-spin text-primary-600" />
+        <span className="ml-2 text-gray-600">Chargement du planning...</span>
+      </div>
+    );
+  }
+
+  if (!creneaux || !salles) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <AlertCircle className="w-8 h-8 text-red-500" />
+        <span className="ml-2 text-red-600">Erreur lors du chargement des données</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,6 +232,14 @@ const Planning = () => {
             >
               Aujourd'hui
             </button>
+
+            {/* Bouton actualiser */}
+            <button
+              onClick={() => refetch()}
+              className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Actualiser
+            </button>
           </div>
         </div>
       </div>
@@ -142,11 +247,18 @@ const Planning = () => {
       {/* Vue planning */}
       <div className="bg-white rounded-lg shadow-soft overflow-hidden">
         {viewMode === 'day' ? (
-          <DayView date={selectedDate} reservations={getReservationsForDate(selectedDate)} />
+          <DayView 
+            date={selectedDate} 
+            reservations={getReservationsForDate(selectedDate)}
+            creneaux={creneaux}
+            salles={salles}
+            planningData={planningData}
+          />
         ) : (
           <WeekView 
             dates={getWeekDays(selectedDate)} 
             getReservationForSlot={getReservationForSlot}
+            creneaux={creneaux}
           />
         )}
       </div>
@@ -173,10 +285,7 @@ const Planning = () => {
   );
 };
 
-const DayView = ({ date, reservations }) => {
-  const creneaux = mockData.creneaux;
-  const salles = mockData.salles;
-
+const DayView = ({ date, reservations, creneaux, salles, planningData }) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full">
@@ -185,7 +294,7 @@ const DayView = ({ date, reservations }) => {
             <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 border-b">
               Créneaux
             </th>
-            {salles.map(salle => (
+            {salles?.map(salle => (
               <th key={salle.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-b border-l">
                 <div>
                   <p className="font-semibold">{salle.nom}</p>
@@ -196,7 +305,7 @@ const DayView = ({ date, reservations }) => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {creneaux.map(creneau => {
+          {creneaux?.map(creneau => {
             const isCurrentSlot = isCurrentTimeSlot(creneau);
             
             return (
@@ -212,9 +321,10 @@ const DayView = ({ date, reservations }) => {
                     </div>
                   </div>
                 </td>
-                {salles.map(salle => {
-                  const reservation = reservations.find(res => 
-                    res.creneau.id === creneau.id && res.salle.id === salle.id
+                {salles?.map(salle => {
+                  // Chercher une réservation pour cette salle et ce créneau
+                  const reservation = planningData?.planning?.[creneau.nom]?.find(res => 
+                    res.salle_detail?.id === salle.id
                   );
                   
                   return (
@@ -239,9 +349,7 @@ const DayView = ({ date, reservations }) => {
   );
 };
 
-const WeekView = ({ dates, getReservationForSlot }) => {
-  const creneaux = mockData.creneaux;
-
+const WeekView = ({ dates, getReservationForSlot, creneaux }) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full">
@@ -268,7 +376,7 @@ const WeekView = ({ dates, getReservationForSlot }) => {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {creneaux.map(creneau => {
+          {creneaux?.map(creneau => {
             const isCurrentSlot = isCurrentTimeSlot(creneau);
             
             return (
@@ -315,16 +423,16 @@ const ReservationCell = ({ reservation }) => {
         <Monitor className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-primary-900 truncate">
-            {reservation.sujet}
+            {reservation.sujet || 'Réservation'}
           </p>
           <div className="flex items-center space-x-1 mt-1">
             <User className="w-3 h-3 text-primary-600" />
             <p className="text-xs text-primary-700">
-              {reservation.enseignant.first_name} {reservation.enseignant.last_name}
+              {reservation.enseignant_detail?.first_name} {reservation.enseignant_detail?.last_name}
             </p>
           </div>
           <p className="text-xs text-primary-600 mt-1">
-            {reservation.formation.nom}
+            {reservation.formation_detail?.nom}
           </p>
         </div>
       </div>
@@ -336,10 +444,10 @@ const WeekReservationCell = ({ reservation }) => {
   return (
     <div className="bg-primary-100 rounded p-2 text-center">
       <p className="text-xs font-medium text-primary-900 truncate">
-        {reservation.salle.nom}
+        {reservation.salle_detail?.nom}
       </p>
       <p className="text-xs text-primary-700 truncate">
-        {reservation.enseignant.last_name}
+        {reservation.enseignant_detail?.last_name}
       </p>
     </div>
   );

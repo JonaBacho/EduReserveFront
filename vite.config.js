@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 9000,
+    port: 9001,
     proxy: {
       '/api': {
         target: 'http://fultang.ddns.net:8011/api/v1/',
