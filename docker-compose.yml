@@ -3,12 +3,8 @@ version: '3.9'
 services:
   # Frontend React sans Nginx
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://fultang.ddns.net:8011/api/v1
-        VITE_APP_VERSION: 1.0.0
+    image: "${MY_IMAGE}"
+    container_name: eduReserveFront
     ports:
       - "9001:9001"
     environment:
