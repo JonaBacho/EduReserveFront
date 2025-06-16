@@ -8,7 +8,7 @@ RUN npm install -g serve
 COPY package*.json ./
 
 # Installer les dépendances
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 
