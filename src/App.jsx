@@ -16,7 +16,6 @@ import Salles from './pages/Salles';
 import Materiels from './pages/Materiels';
 import Formations from './pages/Formations';
 import Statistiques from './pages/Statistiques';
-import './index.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
