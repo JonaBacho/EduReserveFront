@@ -3,7 +3,7 @@ name: Deploy to hetzner cloud
 on:
   push:
     branches:
-      - frontend-v1  # Run this workflow on every push to the main branch
+      - main  # Run this workflow on every push to the main branch
 
 env:
   MY_IMAGE: ghcr.io/$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')/react
