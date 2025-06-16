@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { BookOpen, Eye, EyeOff, User, Mail, IdCard } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, User, Mail, CreditCard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Register = () => {
@@ -126,7 +126,7 @@ const Register = () => {
             {/* Matricule */}
             <div>
               <label htmlFor="matricule" className="block text-sm font-medium text-gray-700 mb-2">
-                <IdCard className="w-4 h-4 inline mr-2" />
+                <CreditCard className="w-4 h-4 inline mr-2" />
                 Matricule *
               </label>
               <input

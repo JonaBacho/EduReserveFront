@@ -1,14 +1,15 @@
+// src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { BookOpen, Eye, EyeOff, User, GraduationCap } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { demoLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -16,26 +17,19 @@ const Login = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      // Simuler une connexion réelle (à remplacer par votre API)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await login(data);
       
-      // Déterminer le type d'utilisateur basé sur le nom d'utilisateur
-      const userType = data.username.startsWith('prof') ? 'enseignant' : 'etudiant';
-      demoLogin(userType);
-      
-      toast.success('Connexion réussie !');
-      navigate('/');
+      if (result.success) {
+        toast.success('Connexion réussie !');
+        navigate('/');
+      } else {
+        toast.error(result.error || 'Erreur de connexion');
+      }
     } catch (error) {
       toast.error('Erreur de connexion');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = (userType) => {
-    demoLogin(userType);
-    toast.success(`Connecté en tant que ${userType}`);
-    navigate('/');
   };
 
   return (
@@ -47,10 +41,10 @@ const Login = () => {
           <div className="mb-8">
             <BookOpen className="w-12 h-12 mb-4" />
             <h1 className="text-4xl font-bold mb-4">
-              Système de Réservations
+              EduReserve
             </h1>
             <p className="text-xl text-primary-100 mb-6">
-              Gérez facilement vos réservations de salles et de matériel pédagogique
+              Système de gestion des réservations de salles et de matériel pédagogique
             </p>
           </div>
           
@@ -65,7 +59,7 @@ const Login = () => {
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-primary-300 rounded-full"></div>
-              <span className="text-primary-100">Interface intuitive</span>
+              <span className="text-primary-100">Interface intuitive et responsive</span>
             </div>
           </div>
         </div>
@@ -81,7 +75,7 @@ const Login = () => {
           {/* Header mobile */}
           <div className="lg:hidden text-center mb-8">
             <BookOpen className="w-12 h-12 mx-auto text-primary-600 mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900">Réservations</h1>
+            <h1 className="text-2xl font-bold text-gray-900">EduReserve</h1>
             <p className="text-gray-600">Connectez-vous à votre compte</p>
           </div>
 
@@ -91,51 +85,23 @@ const Login = () => {
             <p className="text-gray-600">Accédez à votre espace de réservation</p>
           </div>
 
-          {/* Boutons de démo */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-sm font-medium text-gray-700 mb-3">Connexion rapide (Démo) :</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleDemoLogin('enseignant')}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                <User className="w-4 h-4" />
-                <span>Enseignant</span>
-              </button>
-              <button
-                onClick={() => handleDemoLogin('etudiant')}
-                className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                <GraduationCap className="w-4 h-4" />
-                <span>Étudiant</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Séparateur */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">ou connectez-vous avec vos identifiants</span>
-            </div>
-          </div>
-
           {/* Formulaire */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Nom d'utilisateur
+              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-2">
+                <User className="w-4 h-4 inline mr-2" />
+                Nom d'utilisateur ou matricule
               </label>
               <input
-                {...register('username', { required: 'Le nom d\'utilisateur est requis' })}
+                {...register('identifier', { 
+                  required: 'Le nom d\'utilisateur ou matricule est requis' 
+                })}
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="prof.martin ou etudiant1"
+                placeholder="Entrez votre nom d'utilisateur ou matricule"
               />
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+              {errors.identifier && (
+                <p className="mt-1 text-sm text-red-600">{errors.identifier.message}</p>
               )}
             </div>
 
@@ -148,7 +114,7 @@ const Login = () => {
                   {...register('password', { required: 'Le mot de passe est requis' })}
                   type={showPassword ? 'text' : 'password'}
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="password123"
+                  placeholder="Entrez votre mot de passe"
                 />
                 <button
                   type="button"
@@ -179,10 +145,30 @@ const Login = () => {
             </button>
           </form>
 
+          {/* Liens additionnels */}
+          <div className="mt-6 text-center space-y-4">
+            <div className="text-sm">
+              <Link
+                to="/register"
+                className="font-medium text-primary-600 hover:text-primary-500"
+              >
+                Pas encore de compte ? S'inscrire
+              </Link>
+            </div>
+            <div className="text-sm">
+              <Link
+                to="/reset-password"
+                className="font-medium text-gray-600 hover:text-gray-500"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
+          </div>
+
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-500">
-            <p>Système de gestion des réservations</p>
-            <p className="mt-1">Établissement éducatif</p>
+            <p>EduReserve - Système de gestion des réservations</p>
+            <p className="mt-1">Pour les établissements éducatifs</p>
           </div>
         </div>
       </div>
