@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { BookOpen, Eye, EyeOff, User } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, User, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
@@ -21,11 +21,12 @@ const Login = () => {
       
       if (result.success) {
         toast.success('Connexion réussie !');
-        navigate('/');
+        navigate('/', { replace: true });
       } else {
         toast.error(result.error || 'Erreur de connexion');
       }
     } catch (error) {
+      console.error('Erreur de connexion:', error);
       toast.error('Erreur de connexion');
     } finally {
       setLoading(false);
@@ -64,7 +65,7 @@ const Login = () => {
           </div>
         </div>
         
-        {/* Motif décoratif */}
+        {/* Motifs décoratifs */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary-400 bg-opacity-20 rounded-full -translate-y-32 translate-x-32"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary-400 bg-opacity-20 rounded-full translate-y-24 -translate-x-24"></div>
       </div>
@@ -87,17 +88,23 @@ const Login = () => {
 
           {/* Formulaire */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Nom d'utilisateur ou matricule */}
             <div>
               <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-2">
                 <User className="w-4 h-4 inline mr-2" />
-                Nom d'utilisateur ou matricule
+                Nom d'utilisateur ou matricule *
               </label>
               <input
                 {...register('identifier', { 
-                  required: 'Le nom d\'utilisateur ou matricule est requis' 
+                  required: 'Le nom d\'utilisateur ou matricule est requis',
+                  minLength: {
+                    value: 3,
+                    message: 'Au moins 3 caractères requis'
+                  }
                 })}
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                autoComplete="username"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                 placeholder="Entrez votre nom d'utilisateur ou matricule"
               />
               {errors.identifier && (
@@ -105,21 +112,31 @@ const Login = () => {
               )}
             </div>
 
+            {/* Mot de passe */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Mot de passe
+                <Lock className="w-4 h-4 inline mr-2" />
+                Mot de passe *
               </label>
               <div className="relative">
                 <input
-                  {...register('password', { required: 'Le mot de passe est requis' })}
+                  {...register('password', { 
+                    required: 'Le mot de passe est requis',
+                    minLength: {
+                      value: 1,
+                      message: 'Le mot de passe ne peut pas être vide'
+                    }
+                  })}
                   type={showPassword ? 'text' : 'password'}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  autoComplete="current-password"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                   placeholder="Entrez votre mot de passe"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -129,6 +146,22 @@ const Login = () => {
               )}
             </div>
 
+            {/* Options de connexion */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                  Se souvenir de moi
+                </label>
+              </div>
+            </div>
+
+            {/* Bouton de connexion */}
             <button
               type="submit"
               disabled={loading}
@@ -145,24 +178,28 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Liens additionnels */}
-          <div className="mt-6 text-center space-y-4">
+          {/* Lien d'inscription */}
+          <div className="mt-6 text-center">
             <div className="text-sm">
+              <span className="text-gray-600">Pas encore de compte ? </span>
               <Link
                 to="/register"
-                className="font-medium text-primary-600 hover:text-primary-500"
+                className="font-medium text-primary-600 hover:text-primary-500 transition-colors"
               >
-                Pas encore de compte ? S'inscrire
+                S'inscrire
               </Link>
             </div>
-            <div className="text-sm">
-              <Link
-                to="/reset-password"
-                className="font-medium text-gray-600 hover:text-gray-500"
-              >
-                Mot de passe oublié ?
-              </Link>
-            </div>
+          </div>
+
+          {/* Aide */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">Besoin d'aide ?</h3>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• Utilisez votre nom d'utilisateur ou matricule pour vous connecter</li>
+              <li>• Si vous avez oublié votre mot de passe, contactez l'administrateur</li>
+              <li>• Les étudiants peuvent consulter le planning et les ressources</li>
+              <li>• Les enseignants peuvent effectuer des réservations</li>
+            </ul>
           </div>
 
           {/* Footer */}

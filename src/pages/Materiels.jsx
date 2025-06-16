@@ -1,6 +1,7 @@
 // src/pages/Materiels.jsx
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useNavigate } from 'react-router-dom';
 import { 
   Laptop, 
   Plus, 
@@ -12,7 +13,10 @@ import {
   Package,
   Calendar,
   Eye,
-  Tag
+  Tag,
+  RefreshCw,
+  ArrowLeft,
+  Filter
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +25,7 @@ import {
   typeMaterielService,
   handleApiError 
 } from '../services/api';
+import LoadingSpinner, { CardLoader } from '../components/LoadingSpinner';
 
 const Materiels = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +35,9 @@ const Materiels = () => {
   const [editingMateriel, setEditingMateriel] = useState(null);
   const [viewingMateriel, setViewingMateriel] = useState(null);
   const [showCreateTypeModal, setShowCreateTypeModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const { isEnseignant } = useAuth();
+  const navigate = useNavigate();
   
   const queryClient = useQueryClient();
 
@@ -40,6 +47,7 @@ const Materiels = () => {
     () => materielService.getMateriels(),
     {
       select: (response) => response.data.results || response.data,
+      retry: 2,
       onError: (error) => {
         console.error('Erreur lors du chargement des matériels:', error);
         const errorInfo = handleApiError(error);
@@ -54,6 +62,7 @@ const Materiels = () => {
     () => typeMaterielService.getTypesMateriels(),
     {
       select: (response) => response.data.results || response.data,
+      retry: 2,
     }
   );
 
@@ -124,13 +133,19 @@ const Materiels = () => {
     }
   };
 
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Liste actualisée');
+  };
+
   // Filtrer les matériels
   const getFilteredMateriels = () => {
     if (!materiels) return [];
     
     let filtered = materiels.filter(materiel =>
       materiel.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      materiel.numero_serie?.toLowerCase().includes(searchTerm.toLowerCase())
+      materiel.numero_serie?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      materiel.type_materiel_detail?.nom.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (typeFilter !== 'all') {
@@ -166,9 +181,20 @@ const Materiels = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader className="w-8 h-8 animate-spin text-primary-600" />
-        <span className="ml-2 text-gray-600">Chargement des matériels...</span>
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-soft p-6">
+          <div className="skeleton-text w-64 h-8 mb-2"></div>
+          <div className="skeleton-text w-96 h-4"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-soft p-6">
+              <div className="skeleton-text w-20 h-4 mb-2"></div>
+              <div className="skeleton-text w-12 h-8"></div>
+            </div>
+          ))}
+        </div>
+        <CardLoader count={6} />
       </div>
     );
   }
@@ -176,14 +202,21 @@ const Materiels = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center py-12">
-        <AlertCircle className="w-8 h-8 text-red-500" />
-        <span className="ml-2 text-red-600">Erreur lors du chargement des matériels</span>
-        <button 
-          onClick={() => refetch()}
-          className="ml-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-        >
-          Réessayer
-        </button>
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Erreur de chargement</h3>
+          <p className="text-gray-500 mb-4">
+            Impossible de charger la liste des matériels.
+          </p>
+          <div className="space-x-4">
+            <button onClick={handleRefresh} className="btn-primary">
+              Réessayer
+            </button>
+            <button onClick={() => navigate(-1)} className="btn-secondary">
+              Retour
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -193,14 +226,41 @@ const Materiels = () => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow-soft p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Matériels</h1>
-            <p className="text-gray-600">
-              Consultez et gérez le matériel pédagogique disponible
-            </p>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Matériels</h1>
+              <p className="text-gray-600">
+                Consultez et gérez le matériel pédagogique disponible
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Filter className="w-4 h-4" />
+              <span>Filtres</span>
+              {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all') && (
+                <span className="w-2 h-2 bg-primary-600 rounded-full"></span>
+              )}
+            </button>
+
+            <button
+              onClick={handleRefresh}
+              className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              title="Actualiser"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+
             {isEnseignant && (
               <>
                 <button
@@ -222,112 +282,126 @@ const Materiels = () => {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Filtres */}
-      <div className="bg-white rounded-lg shadow-soft p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rechercher
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Nom ou numéro de série..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+        {/* Filtres */}
+        {showFilters && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rechercher
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Nom, numéro de série ou type..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type de matériel
+                </label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="all">Tous les types</option>
+                  {typesMateriels?.map(type => (
+                    <option key={type.id} value={type.id}>
+                      {type.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Statut
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="all">Tous les statuts</option>
+                  <option value="active">Disponibles uniquement</option>
+                  <option value="inactive">Indisponibles uniquement</option>
+                </select>
+              </div>
             </div>
+
+            {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all') && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTypeFilter('all');
+                    setStatusFilter('all');
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Réinitialiser les filtres
+                </button>
+              </div>
+            )}
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type de matériel
-            </label>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">Tous les types</option>
-              {typesMateriels?.map(type => (
-                <option key={type.id} value={type.id}>
-                  {type.nom}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Statut
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="active">Actifs uniquement</option>
-              <option value="inactive">Inactifs uniquement</option>
-            </select>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-              <Laptop className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Actifs</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.actifs}</p>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Total matériels"
+          value={stats.total}
+          icon={Package}
+          color="blue"
+        />
         
-        <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Inactifs</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.inactifs}</p>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Disponibles"
+          value={stats.actifs}
+          icon={Laptop}
+          color="green"
+        />
         
-        <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-              <Tag className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Types</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.types}</p>
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Indisponibles"
+          value={stats.inactifs}
+          icon={AlertCircle}
+          color="red"
+        />
+        
+        <StatCard
+          title="Types"
+          value={stats.types}
+          icon={Tag}
+          color="purple"
+        />
       </div>
 
       {/* Liste des matériels */}
       <div className="bg-white rounded-lg shadow-soft">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Liste des matériels
-            {searchTerm && (
-              <span className="text-sm font-normal text-gray-500 ml-2">
-                - {filteredMateriels.length} résultat(s) pour "{searchTerm}"
-              </span>
-            )}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Liste des matériels
+              {searchTerm && (
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  - {filteredMateriels.length} résultat(s) pour "{searchTerm}"
+                </span>
+              )}
+            </h2>
+            <span className="text-sm text-gray-500">
+              {filteredMateriels.length} matériel{filteredMateriels.length > 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
         
         <div className="p-6">
@@ -345,7 +419,11 @@ const Materiels = () => {
               ))}
             </div>
           ) : (
-            <EmptyState searchTerm={searchTerm} typeFilter={typeFilter} statusFilter={statusFilter} />
+            <EmptyState 
+              searchTerm={searchTerm} 
+              typeFilter={typeFilter} 
+              statusFilter={statusFilter} 
+            />
           )}
         </div>
       </div>
@@ -382,6 +460,29 @@ const Materiels = () => {
   );
 };
 
+const StatCard = ({ title, value, icon: Icon, color }) => {
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-green-50 text-green-600',
+    red: 'bg-red-50 text-red-600',
+    purple: 'bg-purple-50 text-purple-600',
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-soft p-6">
+      <div className="flex items-center">
+        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-semibold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MaterielCard = ({ materiel, onEdit, onDelete, onView, isDeleting }) => {
   const getTypeColor = (type) => {
     const colors = {
@@ -396,15 +497,17 @@ const MaterielCard = ({ materiel, onEdit, onDelete, onView, isDeleting }) => {
   return (
     <div className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 flex-1">
           <div className={`p-2 rounded-lg ${getTypeColor(materiel.type_materiel_detail?.nom)}`}>
             <Laptop className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{materiel.nom}</h3>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(materiel.type_materiel_detail?.nom)}`}>
-              {materiel.type_materiel_detail?.nom}
-            </span>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold text-gray-900 truncate">{materiel.nom}</h3>
+            {materiel.type_materiel_detail && (
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(materiel.type_materiel_detail.nom)}`}>
+                {materiel.type_materiel_detail.nom}
+              </span>
+            )}
           </div>
         </div>
         
@@ -475,10 +578,20 @@ const MaterielModal = ({ materiel, typesMateriels, onClose, onSubmit, isLoading 
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    if (!formData.nom.trim()) {
+      toast.error('Le nom du matériel est requis');
+      return;
+    }
+
+    if (!formData.type_materiel) {
+      toast.error('Le type de matériel est requis');
+      return;
+    }
+    
     const data = {
-      nom: formData.nom,
+      nom: formData.nom.trim(),
       type_materiel: parseInt(formData.type_materiel),
-      numero_serie: formData.numero_serie || null,
+      numero_serie: formData.numero_serie.trim() || null,
       active: formData.active
     };
 
@@ -512,7 +625,8 @@ const MaterielModal = ({ materiel, typesMateriels, onClose, onSubmit, isLoading 
                     type="text"
                     value={formData.nom}
                     onChange={(e) => setFormData({...formData, nom: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="form-input"
+                    placeholder="Ex: MacBook Pro 13, Projecteur Epson..."
                     required
                   />
                 </div>
@@ -524,7 +638,7 @@ const MaterielModal = ({ materiel, typesMateriels, onClose, onSubmit, isLoading 
                   <select
                     value={formData.type_materiel}
                     onChange={(e) => setFormData({...formData, type_materiel: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="form-select"
                     required
                   >
                     <option value="">Sélectionnez un type</option>
@@ -544,8 +658,12 @@ const MaterielModal = ({ materiel, typesMateriels, onClose, onSubmit, isLoading 
                     type="text"
                     value={formData.numero_serie}
                     onChange={(e) => setFormData({...formData, numero_serie: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="form-input"
+                    placeholder="Ex: ABC123456789"
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Numéro d'identification unique du matériel
+                  </p>
                 </div>
                 
                 <div>
@@ -558,6 +676,9 @@ const MaterielModal = ({ materiel, typesMateriels, onClose, onSubmit, isLoading 
                     />
                     <span className="ml-2 text-sm text-gray-700">Matériel disponible</span>
                   </label>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Décochez si le matériel est en maintenance ou hors service
+                  </p>
                 </div>
               </div>
             </div>
@@ -597,7 +718,16 @@ const TypeMaterielModal = ({ onClose, onSubmit, isLoading }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit.mutate(formData);
+    
+    if (!formData.nom.trim()) {
+      toast.error('Le nom du type est requis');
+      return;
+    }
+
+    onSubmit.mutate({
+      nom: formData.nom.trim(),
+      description: formData.description.trim()
+    });
   };
 
   return (
@@ -623,7 +753,8 @@ const TypeMaterielModal = ({ onClose, onSubmit, isLoading }) => {
                     type="text"
                     value={formData.nom}
                     onChange={(e) => setFormData({...formData, nom: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="form-input"
+                    placeholder="Ex: Ordinateur portable, Vidéoprojecteur..."
                     required
                   />
                 </div>
@@ -636,7 +767,8 @@ const TypeMaterielModal = ({ onClose, onSubmit, isLoading }) => {
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="form-textarea"
+                    placeholder="Description optionnelle du type de matériel..."
                   />
                 </div>
               </div>
@@ -690,17 +822,17 @@ const MaterielDetailModal = ({ materiel, onClose }) => {
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Détails du matériel {materiel.nom}
+                Détails du matériel: {materiel.nom}
               </h3>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 text-2xl"
               >
                 ×
               </button>
             </div>
             
-            <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Informations générales</h4>
                 <div className="space-y-2">
@@ -710,7 +842,7 @@ const MaterielDetailModal = ({ materiel, onClose }) => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Type:</span>
-                    <span className="font-medium">{materiel.type_materiel_detail?.nom}</span>
+                    <span className="font-medium">{materiel.type_materiel_detail?.nom || 'Non défini'}</span>
                   </div>
                   {materiel.numero_serie && (
                     <div className="flex justify-between">
@@ -730,12 +862,12 @@ const MaterielDetailModal = ({ materiel, onClose }) => {
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Planning récent</h4>
                 {planningMateriel?.reservations?.length > 0 ? (
-                  <div className="space-y-2">
-                    {planningMateriel.reservations.slice(0, 3).map((reservation, index) => (
-                      <div key={index} className="text-sm">
-                        <span className="text-gray-500">
-                          {reservation.date} - {reservation.creneau_detail?.nom}
-                        </span>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {planningMateriel.reservations.slice(0, 5).map((reservation, index) => (
+                      <div key={index} className="text-sm p-2 bg-gray-50 rounded">
+                        <div className="font-medium">{reservation.date}</div>
+                        <div className="text-gray-600">{reservation.creneau_detail?.nom}</div>
+                        <div className="text-gray-500 text-xs">{reservation.formation_detail?.nom}</div>
                       </div>
                     ))}
                   </div>
@@ -744,6 +876,13 @@ const MaterielDetailModal = ({ materiel, onClose }) => {
                 )}
               </div>
             </div>
+
+            {materiel.type_materiel_detail?.description && (
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-3">Description du type</h4>
+                <p className="text-gray-600 text-sm">{materiel.type_materiel_detail.description}</p>
+              </div>
+            )}
           </div>
           
           <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -772,9 +911,21 @@ const EmptyState = ({ searchTerm, typeFilter, statusFilter }) => {
       <p className="text-gray-500 mb-6">
         {hasFilters
           ? 'Aucun matériel ne correspond aux critères de recherche'
-          : 'Il n\'y a pas encore de matériel créé.'
+          : 'Il n\'y a pas encore de matériel dans la base de données.'
         }
       </p>
+      {hasFilters && (
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setTypeFilter('all');
+            setStatusFilter('all');
+          }}
+          className="btn-secondary mr-4"
+        >
+          Réinitialiser les filtres
+        </button>
+      )}
     </div>
   );
 };

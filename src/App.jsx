@@ -24,44 +24,52 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
     },
   },
 });
 
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <p className="mt-4 text-gray-600">Chargement...</p>
+      </div>
+    </div>
+  );
+}
+
+function ProtectedRoute({ children, requireAuth = true }) {
+  const { user, loading, isAuthenticated } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
   
-  if (!user) {
+  if (requireAuth && !isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  
+  if (!requireAuth && isAuthenticated) {
+    return <Navigate to="/" replace />;
   }
   
   return children;
 }
 
 function EnseignantRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
   
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   
-  if (user.user_type !== 'enseignant') {
+  if (user?.user_type !== 'enseignant') {
     return <Navigate to="/" replace />;
   }
   
@@ -69,85 +77,127 @@ function EnseignantRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   
   return (
     <Routes>
-      {/* Routes publiques */}
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+      {/* Routes publiques (non connecté) */}
+      <Route 
+        path="/login" 
+        element={
+          <ProtectedRoute requireAuth={false}>
+            <Login />
+          </ProtectedRoute>
+        } 
+      />
       
-      {/* Routes protégées */}
-      <Route path="/reset-password" element={
-        <ProtectedRoute>
-          <ResetPassword />
-        </ProtectedRoute>
-      } />
+      <Route 
+        path="/register" 
+        element={
+          <ProtectedRoute requireAuth={false}>
+            <Register />
+          </ProtectedRoute>
+        } 
+      />
       
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Layout>
-            <Dashboard />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      {/* Routes protégées (connecté) */}
+      <Route 
+        path="/reset-password" 
+        element={
+          <ProtectedRoute>
+            <ResetPassword />
+          </ProtectedRoute>
+        } 
+      />
       
-      <Route path="/planning" element={
-        <ProtectedRoute>
-          <Layout>
-            <Planning />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       
-      <Route path="/salles" element={
-        <ProtectedRoute>
-          <Layout>
-            <Salles />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      <Route 
+        path="/planning" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Planning />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       
-      <Route path="/materiels" element={
-        <ProtectedRoute>
-          <Layout>
-            <Materiels />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      <Route 
+        path="/salles" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Salles />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       
-      <Route path="/formations" element={
-        <ProtectedRoute>
-          <Layout>
-            <Formations />
-          </Layout>
-        </ProtectedRoute>
-      } />
+      <Route 
+        path="/materiels" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Materiels />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/formations" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Formations />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       
       {/* Routes réservées aux enseignants */}
-      <Route path="/reservations" element={
-        <EnseignantRoute>
-          <Layout>
-            <Reservations />
-          </Layout>
-        </EnseignantRoute>
-      } />
+      <Route 
+        path="/reservations" 
+        element={
+          <EnseignantRoute>
+            <Layout>
+              <Reservations />
+            </Layout>
+          </EnseignantRoute>
+        } 
+      />
       
-      <Route path="/mes-reservations" element={
-        <EnseignantRoute>
-          <Layout>
-            <MesReservations />
-          </Layout>
-        </EnseignantRoute>
-      } />
+      <Route 
+        path="/mes-reservations" 
+        element={
+          <EnseignantRoute>
+            <Layout>
+              <MesReservations />
+            </Layout>
+          </EnseignantRoute>
+        } 
+      />
       
-      <Route path="/statistiques" element={
-        <EnseignantRoute>
-          <Layout>
-            <Statistiques />
-          </Layout>
-        </EnseignantRoute>
-      } />
+      <Route 
+        path="/statistiques" 
+        element={
+          <EnseignantRoute>
+            <Layout>
+              <Statistiques />
+            </Layout>
+          </EnseignantRoute>
+        } 
+      />
       
       {/* Route 404 */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -169,15 +219,32 @@ function App() {
                 style: {
                   background: '#374151',
                   color: '#fff',
+                  fontSize: '14px',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
                 },
                 success: {
                   style: {
                     background: '#059669',
                   },
+                  iconTheme: {
+                    primary: '#ffffff',
+                    secondary: '#059669',
+                  },
                 },
                 error: {
                   style: {
                     background: '#dc2626',
+                  },
+                  iconTheme: {
+                    primary: '#ffffff',
+                    secondary: '#dc2626',
+                  },
+                },
+                loading: {
+                  style: {
+                    background: '#3b82f6',
                   },
                 },
               }}

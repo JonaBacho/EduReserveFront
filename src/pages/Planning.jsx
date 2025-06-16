@@ -1,6 +1,7 @@
+// src/pages/Planning.jsx
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
-import { Calendar, ChevronLeft, ChevronRight, Monitor, User, Clock, Loader, AlertCircle } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Monitor, User, Clock, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { format, addDays, subDays, startOfWeek, isToday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
@@ -16,7 +17,7 @@ const Planning = () => {
   const [viewMode, setViewMode] = useState('day'); // 'day' ou 'week'
 
   // Charger les créneaux horaires
-  const { data: creneaux, isLoading: loadingCreneaux } = useQuery(
+  const { data: creneaux, isLoading: loadingCreneaux, error: errorCreneaux } = useQuery(
     'creneaux',
     () => creneauService.getCreneaux(),
     {
@@ -29,7 +30,7 @@ const Planning = () => {
   );
 
   // Charger les salles
-  const { data: salles, isLoading: loadingSalles } = useQuery(
+  const { data: salles, isLoading: loadingSalles, error: errorSalles } = useQuery(
     'salles',
     () => salleService.getSalles(),
     {
@@ -42,13 +43,14 @@ const Planning = () => {
   );
 
   // Charger le planning pour la date sélectionnée
-  const { data: planningData, isLoading: loadingPlanning, refetch } = useQuery(
+  const { data: planningData, isLoading: loadingPlanning, refetch, error: errorPlanning } = useQuery(
     ['planning', format(selectedDate, 'yyyy-MM-dd')],
     () => planningService.getPlanningGeneral({
       date: format(selectedDate, 'yyyy-MM-dd')
     }),
     {
       select: (response) => response.data,
+      retry: 2,
       onError: (error) => {
         console.error('Erreur lors du chargement du planning:', error);
         const errorInfo = handleApiError(error);
@@ -62,22 +64,38 @@ const Planning = () => {
   const { data: weekPlanningData, isLoading: loadingWeekPlanning } = useQuery(
     ['week-planning', weekDates.map(d => format(d, 'yyyy-MM-dd')).join(',')],
     async () => {
-      const planningPromises = weekDates.map(date => 
-        planningService.getPlanningGeneral({
-          date: format(date, 'yyyy-MM-dd')
-        }).then(response => ({
-          date: format(date, 'yyyy-MM-dd'),
-          data: response.data
-        }))
-      );
-      const results = await Promise.all(planningPromises);
-      return results.reduce((acc, result) => {
-        acc[result.date] = result.data;
-        return acc;
-      }, {});
+      try {
+        const planningPromises = weekDates.map(async (date) => {
+          try {
+            const response = await planningService.getPlanningGeneral({
+              date: format(date, 'yyyy-MM-dd')
+            });
+            return {
+              date: format(date, 'yyyy-MM-dd'),
+              data: response.data
+            };
+          } catch (error) {
+            console.error(`Erreur pour la date ${format(date, 'yyyy-MM-dd')}:`, error);
+            return {
+              date: format(date, 'yyyy-MM-dd'),
+              data: { planning: {} }
+            };
+          }
+        });
+        
+        const results = await Promise.all(planningPromises);
+        return results.reduce((acc, result) => {
+          acc[result.date] = result.data;
+          return acc;
+        }, {});
+      } catch (error) {
+        console.error('Erreur lors du chargement du planning hebdomadaire:', error);
+        throw error;
+      }
     },
     {
       enabled: viewMode === 'week',
+      retry: 1,
       onError: (error) => {
         console.error('Erreur lors du chargement du planning hebdomadaire:', error);
         toast.error('Erreur lors du chargement du planning hebdomadaire');
@@ -93,27 +111,19 @@ const Planning = () => {
     }
   };
 
-  const getWeekDays = (date) => {
-    const start = startOfWeek(date, { weekStartsOn: 1 }); // Commence le lundi
-    return Array.from({ length: 5 }, (_, i) => addDays(start, i)); // Seulement les jours ouvrables
+  const goToToday = () => {
+    setSelectedDate(new Date());
   };
 
-  const getReservationsForDate = (date) => {
-    if (!planningData || !planningData.planning) return [];
-    
-    const dateStr = format(date, 'yyyy-MM-dd');
-    if (dateStr !== planningData.date) return [];
-    
-    // Extraire toutes les réservations de tous les créneaux
-    const allReservations = [];
-    Object.values(planningData.planning).forEach(creneauReservations => {
-      if (Array.isArray(creneauReservations)) {
-        allReservations.push(...creneauReservations);
-      }
-    });
-    
-    return allReservations;
+  const handleRefresh = () => {
+    refetch();
+    toast.success('Planning actualisé');
   };
+
+  function getWeekDays(date) {
+    const start = startOfWeek(date, { weekStartsOn: 1 }); // Commence le lundi
+    return Array.from({ length: 5 }, (_, i) => addDays(start, i)); // Seulement les jours ouvrables
+  }
 
   const getReservationForSlot = (date, creneauId) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -141,20 +151,35 @@ const Planning = () => {
   const isLoading = loadingCreneaux || loadingSalles || 
                    (viewMode === 'day' ? loadingPlanning : loadingWeekPlanning);
 
+  const hasError = errorCreneaux || errorSalles || errorPlanning;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader className="w-8 h-8 animate-spin text-primary-600" />
-        <span className="ml-2 text-gray-600">Chargement du planning...</span>
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Chargement du planning...</p>
+        </div>
       </div>
     );
   }
 
-  if (!creneaux || !salles) {
+  if (hasError || !creneaux || !salles) {
     return (
       <div className="flex items-center justify-center py-12">
-        <AlertCircle className="w-8 h-8 text-red-500" />
-        <span className="ml-2 text-red-600">Erreur lors du chargement des données</span>
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Erreur de chargement</h3>
+          <p className="text-gray-500 mb-4">
+            Impossible de charger les données du planning.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary"
+          >
+            Réessayer
+          </button>
+        </div>
       </div>
     );
   }
@@ -171,7 +196,7 @@ const Planning = () => {
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
             {/* Sélecteur de vue */}
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
@@ -201,6 +226,7 @@ const Planning = () => {
               <button
                 onClick={() => navigateDate('prev')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Précédent"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -220,26 +246,29 @@ const Planning = () => {
               <button
                 onClick={() => navigateDate('next')}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Suivant"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Bouton aujourd'hui */}
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className="px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-            >
-              Aujourd'hui
-            </button>
+            {/* Actions */}
+            <div className="flex space-x-2">
+              <button
+                onClick={goToToday}
+                className="px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+              >
+                Aujourd'hui
+              </button>
 
-            {/* Bouton actualiser */}
-            <button
-              onClick={() => refetch()}
-              className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              Actualiser
-            </button>
+              <button
+                onClick={handleRefresh}
+                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                title="Actualiser"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -249,16 +278,17 @@ const Planning = () => {
         {viewMode === 'day' ? (
           <DayView 
             date={selectedDate} 
-            reservations={getReservationsForDate(selectedDate)}
             creneaux={creneaux}
             salles={salles}
             planningData={planningData}
+            isLoading={loadingPlanning}
           />
         ) : (
           <WeekView 
             dates={getWeekDays(selectedDate)} 
             getReservationForSlot={getReservationForSlot}
             creneaux={creneaux}
+            isLoading={loadingWeekPlanning}
           />
         )}
       </div>
@@ -266,7 +296,7 @@ const Planning = () => {
       {/* Légende */}
       <div className="bg-white rounded-lg shadow-soft p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Légende</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-primary-500 rounded"></div>
             <span className="text-sm text-gray-600">Salle réservée</span>
@@ -279,26 +309,44 @@ const Planning = () => {
             <div className="w-4 h-4 bg-yellow-500 rounded"></div>
             <span className="text-sm text-gray-600">Créneau en cours</span>
           </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-red-500 rounded"></div>
+            <span className="text-sm text-gray-600">Salle indisponible</span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const DayView = ({ date, reservations, creneaux, salles, planningData }) => {
+const DayView = ({ date, creneaux, salles, planningData, isLoading }) => {
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <Loader className="w-6 h-6 animate-spin text-primary-600 mx-auto mb-2" />
+        <p className="text-gray-500">Chargement du planning...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 border-b">
+            <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 border-b sticky left-0 bg-gray-50 z-10">
               Créneaux
             </th>
             {salles?.map(salle => (
-              <th key={salle.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-b border-l">
+              <th key={salle.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-b border-l min-w-[200px]">
                 <div>
                   <p className="font-semibold">{salle.nom}</p>
-                  <p className="text-xs text-gray-500">Cap. {salle.capacite}</p>
+                  <p className="text-xs text-gray-500">Capacité: {salle.capacite}</p>
+                  {salle.equipements && (
+                    <p className="text-xs text-gray-400 truncate mt-1" title={salle.equipements}>
+                      {salle.equipements}
+                    </p>
+                  )}
                 </div>
               </th>
             ))}
@@ -310,7 +358,7 @@ const DayView = ({ date, reservations, creneaux, salles, planningData }) => {
             
             return (
               <tr key={creneau.id} className={isCurrentSlot ? 'bg-yellow-50' : ''}>
-                <td className="px-6 py-4 border-r">
+                <td className="px-6 py-4 border-r sticky left-0 bg-white z-10">
                   <div className="flex items-center space-x-2">
                     <Clock className="w-4 h-4 text-gray-400" />
                     <div>
@@ -332,10 +380,7 @@ const DayView = ({ date, reservations, creneaux, salles, planningData }) => {
                       {reservation ? (
                         <ReservationCell reservation={reservation} />
                       ) : (
-                        <div className="text-center py-6">
-                          <div className="w-full h-2 bg-gray-100 rounded"></div>
-                          <p className="text-xs text-gray-400 mt-2">Disponible</p>
-                        </div>
+                        <EmptySlot isCurrentSlot={isCurrentSlot} />
                       )}
                     </td>
                   );
@@ -349,17 +394,26 @@ const DayView = ({ date, reservations, creneaux, salles, planningData }) => {
   );
 };
 
-const WeekView = ({ dates, getReservationForSlot, creneaux }) => {
+const WeekView = ({ dates, getReservationForSlot, creneaux, isLoading }) => {
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center">
+        <Loader className="w-6 h-6 animate-spin text-primary-600 mx-auto mb-2" />
+        <p className="text-gray-500">Chargement du planning hebdomadaire...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 border-b">
+            <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 border-b sticky left-0 bg-gray-50 z-10">
               Créneaux
             </th>
             {dates.map(date => (
-              <th key={date.toISOString()} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-b border-l">
+              <th key={date.toISOString()} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-b border-l min-w-[150px]">
                 <div>
                   <p className="font-semibold">
                     {format(date, 'EEEE', { locale: fr })}
@@ -381,7 +435,7 @@ const WeekView = ({ dates, getReservationForSlot, creneaux }) => {
             
             return (
               <tr key={creneau.id} className={isCurrentSlot ? 'bg-yellow-50' : ''}>
-                <td className="px-6 py-4 border-r">
+                <td className="px-6 py-4 border-r sticky left-0 bg-white z-10">
                   <div className="flex items-center space-x-2">
                     <Clock className="w-4 h-4 text-gray-400" />
                     <div>
@@ -418,7 +472,7 @@ const WeekView = ({ dates, getReservationForSlot, creneaux }) => {
 
 const ReservationCell = ({ reservation }) => {
   return (
-    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 hover:bg-primary-100 transition-colors">
       <div className="flex items-start space-x-2">
         <Monitor className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" />
         <div className="min-w-0 flex-1">
@@ -427,11 +481,11 @@ const ReservationCell = ({ reservation }) => {
           </p>
           <div className="flex items-center space-x-1 mt-1">
             <User className="w-3 h-3 text-primary-600" />
-            <p className="text-xs text-primary-700">
+            <p className="text-xs text-primary-700 truncate">
               {reservation.enseignant_detail?.first_name} {reservation.enseignant_detail?.last_name}
             </p>
           </div>
-          <p className="text-xs text-primary-600 mt-1">
+          <p className="text-xs text-primary-600 mt-1 truncate">
             {reservation.formation_detail?.nom}
           </p>
         </div>
@@ -442,7 +496,7 @@ const ReservationCell = ({ reservation }) => {
 
 const WeekReservationCell = ({ reservation }) => {
   return (
-    <div className="bg-primary-100 rounded p-2 text-center">
+    <div className="bg-primary-100 rounded p-2 text-center hover:bg-primary-200 transition-colors">
       <p className="text-xs font-medium text-primary-900 truncate">
         {reservation.salle_detail?.nom}
       </p>
@@ -453,8 +507,19 @@ const WeekReservationCell = ({ reservation }) => {
   );
 };
 
+const EmptySlot = ({ isCurrentSlot }) => {
+  return (
+    <div className="text-center py-6">
+      <div className={`w-full h-2 rounded ${isCurrentSlot ? 'bg-yellow-200' : 'bg-gray-100'}`}></div>
+      <p className="text-xs text-gray-400 mt-2">Disponible</p>
+    </div>
+  );
+};
+
 // Fonction utilitaire pour vérifier si c'est le créneau actuel
 const isCurrentTimeSlot = (creneau) => {
+  if (!isToday(new Date())) return false;
+  
   const now = new Date();
   const currentTime = format(now, 'HH:mm');
   return currentTime >= creneau.heure_debut && currentTime <= creneau.heure_fin;
