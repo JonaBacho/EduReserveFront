@@ -1,0 +1,61 @@
+name: Deploy to hetzner cloud
+
+on:
+  push:
+    branches:
+      - frontend-v1  # Run this workflow on every push to the main branch
+
+env:
+  MY_IMAGE: ghcr.io/$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')/react
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Log in to GitHub Packages
+        run: echo ${PERSONAL_ACCESS_TOKEN} | docker login ghcr.io -u ${{ secrets.NAMESPACE }} --password-stdin
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Build and tag Docker image
+        run: |
+          docker build -t ${{ env.FULTANG_IMAGE }} .
+
+      - name: Push to Github Packages
+        run: |
+          docker push ${{ env.FULTANG_IMAGE }}
+
+      - name: Add environment variables to .env
+        run: |
+            echo SECRET_KEY=${{ secrets.SECRET_KEY }} >> .env
+            echo MY_IMAGE=${{ env.MY_IMAGE }} >> .env
+            echo NAMESPACE=${{ secrets.NAMESPACE }} >> .env
+            echo PERSONAL_ACCESS_TOKEN=${{ secrets.PERSONAL_ACCESS_TOKEN }} >> .env
+
+      - name: Add the private SSH key to the ssh-agent
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+            mkdir -p ~/.ssh
+            ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            ssh-add - <<< "${{ secrets.PRIVATE_KEY }}"
+
+      - name: Build and deploy images on Server
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+            scp  -o StrictHostKeyChecking=no -r ./.env ./docker-compose.yml ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP_ADDRESS }}:/home/${{ secrets.REMOTE_USER }}/eduReserve/frontend
+            ssh -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP_ADDRESS }} << 'ENDSSH'
+              cd /home/${{ secrets.REMOTE_USER }}/eduReserve/frontend
+              source .env
+              sudo docker login ghcr.io -u $NAMESPACE -p $PERSONAL_ACCESS_TOKEN
+              sudo docker compose -f ./docker-compose.yml down
+              sudo docker rmi -f $MY_IMAGE
+              sudo docker pull $MY_IMAGE
+              sudo docker compose -f ./docker-compose.yml up -d
+            ENDSSH
