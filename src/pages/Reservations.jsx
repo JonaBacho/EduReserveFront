@@ -90,11 +90,11 @@ const Reservations = () => {
   );
 
   const handleTabChange = (newTab) => {
-  setActiveTab(newTab);
-  reset();
-  setShowAvailability(false);
-  setAvailabilityResult(null);
-};
+    setActiveTab(newTab);
+    reset();
+    setShowAvailability(false);
+    setAvailabilityResult(null);
+  };
 
   const onSubmit = async (data) => {
   if (!availabilityResult?.disponible) {

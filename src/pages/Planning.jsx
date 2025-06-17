@@ -190,7 +190,7 @@ const Planning = () => {
       <div className="bg-white rounded-lg shadow-soft p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Planning des salles</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Planning Salle</h1>
             <p className="text-gray-600">
               Consultez les réservations de salles et leur disponibilité
             </p>
