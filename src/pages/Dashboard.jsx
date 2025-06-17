@@ -225,39 +225,39 @@ const getQuickStats = () => {
         {isEnseignant ? (
           <>
             <StatCard
-              title="Mes réservations"
-              value={stats.total}
-              icon={BookOpen}
-              color="blue"
-              link="/mes-reservations"
-              subtitle="Total actives"
+                title="Mes réservations"
+                value={stats.total}
+                icon={BookOpen}
+                color="blue"
+                link="/mes-reservations"
+                subtitle="Total actives"
             />
             <StatCard
-              title="Aujourd'hui"
-              value={stats.aujourdhui}
-              icon={Clock}
-              color="green"
-              link="/planning"
-              subtitle="Réservations"
+                title="Heures effectuées"
+                value={`${stats.heuresEffectuees}h`}
+                icon={Clock}
+                color="green"
+                link="/mes-reservations"
+                subtitle="Total réalisées"
             />
             <StatCard
-              title="Cette semaine"
-              value={stats.semaine}
-              icon={Calendar}
-              color="orange"
-              link="/planning"
-              subtitle="À venir"
+                title="Cette semaine"
+                value={stats.semaine}
+                icon={Calendar}
+                color="orange"
+                link="/planning"
+                subtitle="À venir"
             />
             <StatCard
-              title="Total global"
-              value={statistiques?.data?.total_reservations_salles || 0}
-              icon={TrendingUp}
-              color="purple"
-              link="/statistiques"
-              subtitle="Réservations"
-              isLoading={loadingStats}
+                title="Total global"
+                value={statistiques?.data?.total_reservations_salles || 0}
+                icon={TrendingUp}
+                color="purple"
+                link="/statistiques"
+                subtitle="Réservations"
+                isLoading={loadingStats}
             />
-          </>
+        </>
         ) : (
           <>
             <StatCard
