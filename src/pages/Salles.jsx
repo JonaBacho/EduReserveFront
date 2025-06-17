@@ -241,41 +241,39 @@ const Salles = () => {
         </div>
         
         <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
+            <div className="flex items-center">
             <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-              <Users className="w-6 h-6" />
+                <Users className="w-6 h-6" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Capacité totale</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalCapacite}</p>
+                <p className="text-sm font-medium text-gray-600">Salles disponibles</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.disponibles}</p>
             </div>
-          </div>
+            </div>
         </div>
         
         <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-              <Search className="w-6 h-6" />
+            <div className="flex items-center">
+                <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                    <Users className="w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Capacité totale</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.capaciteTotale}</p>
+                </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Résultats</p>
-              <p className="text-2xl font-semibold text-gray-900">{filteredSalles.length}</p>
-            </div>
-          </div>
         </div>
         
         <div className="bg-white rounded-lg shadow-soft p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Capacité moy.</p>
-              <p className="text-2xl font-semibold text-gray-900">
-                {stats.total > 0 ? Math.round(stats.totalCapacite / stats.total) : 0}
-              </p>
-            </div>
-          </div>
+            <div className="flex items-center">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                    <Users className="w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">Capacité moyenne</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.capaciteMoyenne}</p>
+                </div>
+                </div>
         </div>
       </div>
 
