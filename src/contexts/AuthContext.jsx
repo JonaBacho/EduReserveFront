@@ -97,49 +97,51 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credentials) => {
-    try {
-      dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
+  try {
+    dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
+    
+    const response = await authService.login(credentials);
+    
+    // Correction : Adapter selon la structure de réponse de votre API Django
+    if (response.data && (response.data.access || response.data.token)) {
+      const { access, token, user } = response.data;
+      const authToken = access || token; // Support des deux formats
       
-      const response = await authService.login(credentials);
+      // Stocker le token et les données utilisateur
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userData', JSON.stringify(user));
       
-      if (response.data && response.data.access) {
-        const { access, user } = response.data;
-        
-        // Stocker le token et les données utilisateur
-        localStorage.setItem('authToken', access);
-        localStorage.setItem('userData', JSON.stringify(user));
-        
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: { user }
-        });
-        
-        return { success: true };
-      } else {
-        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
-        return { 
-          success: false, 
-          error: 'Réponse invalide du serveur' 
-        };
-      }
-    } catch (error) {
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: { user }
+      });
+      
+      return { success: true };
+    } else {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
-      const errorInfo = handleApiError(error);
-      
-      if (error.response?.status === 401) {
-        return { 
-          success: false, 
-          error: 'Nom d\'utilisateur ou mot de passe incorrect' 
-        };
-      }
-      
       return { 
         success: false, 
-        error: errorInfo.message,
-        details: errorInfo.details
+        error: 'Réponse invalide du serveur' 
       };
     }
-  };
+  } catch (error) {
+    dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
+    const errorInfo = handleApiError(error);
+    
+    if (error.response?.status === 401) {
+      return { 
+        success: false, 
+        error: 'Nom d\'utilisateur ou mot de passe incorrect' 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: errorInfo.message,
+      details: errorInfo.details
+    };
+  }
+};
 
   const register = async (userData) => {
     try {

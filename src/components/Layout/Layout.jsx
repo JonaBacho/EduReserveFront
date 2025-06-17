@@ -25,15 +25,15 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
 
   const navigation = [
-    { name: 'Tableau de bord', href: '/', icon: Home, roles: ['enseignant', 'etudiant'] },
-    { name: 'Planning', href: '/planning', icon: Calendar, roles: ['enseignant', 'etudiant'] },
-    { name: 'Nouvelles réservations', href: '/reservations', icon: BookOpen, roles: ['enseignant'] },
-    { name: 'Mes réservations', href: '/mes-reservations', icon: User, roles: ['enseignant'] },
-    { name: 'Salles', href: '/salles', icon: Monitor, roles: ['enseignant', 'etudiant'] },
-    { name: 'Matériels', href: '/materiels', icon: Monitor, roles: ['enseignant', 'etudiant'] },
-    { name: 'Formations', href: '/formations', icon: Users, roles: ['enseignant', 'etudiant'] },
-    { name: 'Statistiques', href: '/statistiques', icon: BarChart3, roles: ['enseignant'] },
-  ].filter(item => item.roles.includes(user?.user_type));
+  { name: 'Tableau de bord', href: '/', icon: Home, roles: ['enseignant', 'etudiant'] },
+  { name: 'Planning', href: '/planning', icon: Calendar, roles: ['enseignant', 'etudiant'] },
+  { name: 'Nouvelles réservations', href: '/reservations', icon: BookOpen, roles: ['enseignant'] },
+  { name: 'Mes réservations', href: '/mes-reservations', icon: User, roles: ['enseignant'] },
+  { name: 'Salles', href: '/salles', icon: Monitor, roles: ['enseignant', 'etudiant'] },
+  { name: 'Matériels', href: '/materiels', icon: Monitor, roles: ['enseignant', 'etudiant'] },
+  { name: 'Formations', href: '/formations', icon: Users, roles: ['enseignant', 'etudiant'] },
+  { name: 'Statistiques', href: '/statistiques', icon: BarChart3, roles: ['enseignant'] },
+].filter(item => user?.user_type && item.roles.includes(user.user_type));
 
   const handleLogout = async () => {
     try {

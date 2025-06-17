@@ -44,20 +44,24 @@ const Planning = () => {
 
   // Charger le planning pour la date sélectionnée
   const { data: planningData, isLoading: loadingPlanning, refetch, error: errorPlanning } = useQuery(
-    ['planning', format(selectedDate, 'yyyy-MM-dd')],
-    () => planningService.getPlanningGeneral({
-      date: format(selectedDate, 'yyyy-MM-dd')
-    }),
-    {
-      select: (response) => response.data,
-      retry: 2,
-      onError: (error) => {
-        console.error('Erreur lors du chargement du planning:', error);
-        const errorInfo = handleApiError(error);
-        toast.error(`Erreur planning: ${errorInfo.message}`);
-      }
-    }
-  );
+  ['planning', format(selectedDate, 'yyyy-MM-dd')],
+  () => planningService.getPlanningGeneral({
+    date: format(selectedDate, 'yyyy-MM-dd')
+  }),
+  {
+    select: (response) => response.data,
+    retry: 2,
+    // Correction : Ajouter une gestion d'erreur plus robuste
+    onError: (error) => {
+      console.error('Erreur lors du chargement du planning:', error);
+      const errorInfo = handleApiError(error);
+      toast.error(`Erreur planning: ${errorInfo.message}`);
+    },
+    // Correction : Éviter les requêtes trop fréquentes
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  }
+);
 
   // Charger le planning pour la semaine (mode semaine)
   const weekDates = getWeekDays(selectedDate);
@@ -126,27 +130,29 @@ const Planning = () => {
   }
 
   const getReservationForSlot = (date, creneauId) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    
-    if (viewMode === 'week' && weekPlanningData && weekPlanningData[dateStr]) {
-      const dayPlanning = weekPlanningData[dateStr];
-      if (dayPlanning.planning) {
-        const creneau = creneaux?.find(c => c.id === creneauId);
-        if (creneau && dayPlanning.planning[creneau.nom]) {
-          return dayPlanning.planning[creneau.nom][0]; // Prendre la première réservation
-        }
-      }
-    } else if (viewMode === 'day' && planningData && isSameDay(new Date(planningData.date), date)) {
-      if (planningData.planning) {
-        const creneau = creneaux?.find(c => c.id === creneauId);
-        if (creneau && planningData.planning[creneau.nom]) {
-          return planningData.planning[creneau.nom][0]; // Prendre la première réservation
-        }
+  const dateStr = format(date, 'yyyy-MM-dd');
+  
+  if (viewMode === 'week' && weekPlanningData && weekPlanningData[dateStr]) {
+    const dayPlanning = weekPlanningData[dateStr];
+    // Correction : Vérifier la structure des données
+    if (dayPlanning.planning && Object.keys(dayPlanning.planning).length > 0) {
+      const creneau = creneaux?.find(c => c.id === creneauId);
+      if (creneau && dayPlanning.planning[creneau.nom]) {
+        return dayPlanning.planning[creneau.nom][0];
       }
     }
-    
-    return null;
-  };
+  } else if (viewMode === 'day' && planningData && isSameDay(new Date(planningData.date || dateStr), date)) {
+    // Correction : Vérifier la structure des données
+    if (planningData.planning && Object.keys(planningData.planning).length > 0) {
+      const creneau = creneaux?.find(c => c.id === creneauId);
+      if (creneau && planningData.planning[creneau.nom]) {
+        return planningData.planning[creneau.nom][0];
+      }
+    }
+  }
+  
+  return null;
+};
 
   const isLoading = loadingCreneaux || loadingSalles || 
                    (viewMode === 'day' ? loadingPlanning : loadingWeekPlanning);

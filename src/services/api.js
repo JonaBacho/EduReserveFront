@@ -1,228 +1,364 @@
+// src/services/api.js
 import axios from 'axios';
 
-// Configuration de base pour l'API
-export const api = axios.create({
-  baseURL: '/api/v1',
+const API_BASE_URL = 'http://fultang.ddns.net:8011/api/v1';
+
+// Configuration d'axios
+const api = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Intercepteur de requête pour ajouter le token
+// Intercepteur pour ajouter le token d'authentification
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
-);
-
-// Intercepteur de réponse pour gérer les erreurs et le refresh token
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        try {
-          const response = await axios.post('/api/v1/token/refresh/', {
-            refresh: refreshToken
-          });
-          
-          const newAccessToken = response.data.access;
-          localStorage.setItem('access_token', newAccessToken);
-          
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Refresh token invalide, redirection vers login
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-        }
-      } else {
-        // Pas de refresh token, redirection vers login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-    }
-    
+  (error) => {
     return Promise.reject(error);
   }
 );
 
-// Services d'authentification
-export const authService = {
-  login: (credentials) => api.post('/login/', {
-    identifier: credentials.username || credentials.identifier,
-    password: credentials.password
-  }),
-  register: (userData) => api.post('/register/', userData),
-  resetPassword: (passwordData) => api.post('/reset-password/', passwordData),
-  getCurrentUser: () => api.get('/me/'),
-  logout: () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    return Promise.resolve();
+// Intercepteur pour gérer les erreurs de réponse
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userData');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
   }
-};
+);
 
-// Services utilisateurs
-export const userService = {
-  getUsers: (params) => api.get('/api/users/', { params }),
-  getUser: (id) => api.get(`/api/users/${id}/`),
-};
-
-// Services formations
-export const formationService = {
-  getFormations: (params) => api.get('/api/formations/', { params }),
-  getFormation: (id) => api.get(`/api/formations/${id}/`),
-  createFormation: (data) => api.post('/api/formations/', data),
-  updateFormation: (id, data) => api.put(`/api/formations/${id}/`, data),
-  partialUpdateFormation: (id, data) => api.patch(`/api/formations/${id}/`, data),
-  deleteFormation: (id) => api.delete(`/api/formations/${id}/`),
-};
-
-// Services salles
-export const salleService = {
-  getSalles: (params) => api.get('/api/salles/', { params }),
-  getSalle: (id) => api.get(`/api/salles/${id}/`),
-  createSalle: (data) => api.post('/api/salles/', data),
-  updateSalle: (id, data) => api.put(`/api/salles/${id}/`, data),
-  partialUpdateSalle: (id, data) => api.patch(`/api/salles/${id}/`, data),
-  deleteSalle: (id) => api.delete(`/api/salles/${id}/`),
-  getPlanningSalle: (id, params) => api.get(`/api/salles/${id}/planning/`, { params }),
-};
-
-// Services matériels
-export const materielService = {
-  getMateriels: (params) => api.get('/api/materiels/', { params }),
-  getMateriel: (id) => api.get(`/api/materiels/${id}/`),
-  createMateriel: (data) => api.post('/api/materiels/', data),
-  updateMateriel: (id, data) => api.put(`/api/materiels/${id}/`, data),
-  partialUpdateMateriel: (id, data) => api.patch(`/api/materiels/${id}/`, data),
-  deleteMateriel: (id) => api.delete(`/api/materiels/${id}/`),
-  getPlanningMateriel: (id, params) => api.get(`/api/materiels/${id}/planning/`, { params }),
-};
-
-// Services types de matériel
-export const typeMaterielService = {
-  getTypesMateriels: (params) => api.get('/api/types-materiel/', { params }),
-  getTypeMateriel: (id) => api.get(`/api/types-materiel/${id}/`),
-  createTypeMateriel: (data) => api.post('/api/types-materiel/', data),
-  updateTypeMateriel: (id, data) => api.put(`/api/types-materiel/${id}/`, data),
-  partialUpdateTypeMateriel: (id, data) => api.patch(`/api/types-materiel/${id}/`, data),
-  deleteTypeMateriel: (id) => api.delete(`/api/types-materiel/${id}/`),
-};
-
-// Services créneaux
-export const creneauService = {
-  getCreneaux: () => api.get('/api/creneaux/'),
-  getCreneau: (id) => api.get(`/api/creneaux/${id}/`),
-};
-
-// Services réservations
-export const reservationService = {
-  // Réservations de salles
-  getReservationsSalles: (params) => api.get('/api/reservations-salles/', { params }),
-  getReservationSalle: (id) => api.get(`/api/reservations-salles/${id}/`),
-  createReservationSalle: (data) => api.post('/api/reservations-salles/', data),
-  updateReservationSalle: (id, data) => api.put(`/api/reservations-salles/${id}/`, data),
-  partialUpdateReservationSalle: (id, data) => api.patch(`/api/reservations-salles/${id}/`, data),
-  deleteReservationSalle: (id) => api.delete(`/api/reservations-salles/${id}/`),
-  
-  // Réservations de matériels
-  getReservationsMateriels: (params) => api.get('/api/reservations-materiels/', { params }),
-  getReservationMateriel: (id) => api.get(`/api/reservations-materiels/${id}/`),
-  createReservationMateriel: (data) => api.post('/api/reservations-materiels/', data),
-  updateReservationMateriel: (id, data) => api.put(`/api/reservations-materiels/${id}/`, data),
-  partialUpdateReservationMateriel: (id, data) => api.patch(`/api/reservations-materiels/${id}/`, data),
-  deleteReservationMateriel: (id) => api.delete(`/api/reservations-materiels/${id}/`),
-  
-  // Services spéciaux
-  getMesReservations: (params) => api.get('/mes-reservations/', { params }),
-};
-
-// Services récapitulatifs
-export const recapitulatifService = {
-  getRecapitulatifs: (params) => api.get('/api/recapitulatifs/', { params }),
-  getRecapitulatif: (id) => api.get(`/api/recapitulatifs/${id}/`),
-  createRecapitulatif: (data) => api.post('/api/recapitulatifs/', data),
-  updateRecapitulatif: (id, data) => api.put(`/api/recapitulatifs/${id}/`, data),
-  partialUpdateRecapitulatif: (id, data) => api.patch(`/api/recapitulatifs/${id}/`, data),
-  deleteRecapitulatif: (id) => api.delete(`/api/recapitulatifs/${id}/`),
-};
-
-// Services planning et disponibilité
-export const planningService = {
-  getPlanningGeneral: (params) => api.get('/planning/', { params }),
-  getPlanningEnseignant: (enseignantId, params) => 
-    api.get(`/planning-enseignant/${enseignantId}/`, { params }),
-  checkDisponibilite: (data) => api.post('/disponibilite/', data),
-};
-
-// Services statistiques
-export const statistiquesService = {
-  getStatistiques: () => api.get('/statistiques/'),
-};
-
-// Utilitaires pour gestion des erreurs
+// Fonction utilitaire pour gérer les erreurs
 export const handleApiError = (error) => {
-  console.error('API Error:', error);
-  
-  if (error.response?.data) {
-    const errorData = error.response.data;
+  if (error.response) {
+    const { status, data } = error.response;
     
-    // Erreurs de validation
-    if (errorData.errors || errorData.non_field_errors) {
+    if (status === 400) {
+      return {
+        message: data.detail || data.message || 'Données invalides',
+        details: data
+      };
+    } else if (status === 401) {
+      return {
+        message: 'Session expirée, veuillez vous reconnecter',
+        details: data
+      };
+    } else if (status === 403) {
+      return {
+        message: 'Accès non autorisé',
+        details: data
+      };
+    } else if (status === 404) {
+      return {
+        message: 'Ressource non trouvée',
+        details: data
+      };
+    } else if (status === 500) {
+      return {
+        message: 'Erreur serveur, veuillez réessayer plus tard',
+        details: data
+      };
+    }
+    
+    // Correction : Gestion des erreurs de validation Django
+    if (status === 422 || (status === 400 && data.errors)) {
       return {
         message: 'Erreur de validation',
-        details: errorData.errors || errorData.non_field_errors
+        details: data.errors || data
       };
     }
     
-    // Erreur simple avec message
-    if (errorData.detail) {
-      return {
-        message: errorData.detail
-      };
-    }
-    
-    // Message générique basé sur le status
-    switch (error.response.status) {
-      case 400:
-        return { message: 'Données invalides' };
-      case 401:
-        return { message: 'Non autorisé' };
-      case 403:
-        return { message: 'Accès interdit' };
-      case 404:
-        return { message: 'Ressource non trouvée' };
-      case 500:
-        return { message: 'Erreur serveur' };
-      default:
-        return { message: 'Une erreur est survenue' };
-    }
+    return {
+      message: data.detail || data.message || 'Une erreur est survenue',
+      details: data
+    };
+  } else if (error.request) {
+    return {
+      message: 'Problème de connexion au serveur',
+      details: null
+    };
   }
   
-  return { message: 'Erreur de connexion' };
-};
-
-// Helper pour la pagination
-export const buildPaginationParams = (page = 1, pageSize = 20, filters = {}) => {
   return {
-    page,
-    page_size: pageSize,
-    ...filters
+    message: 'Une erreur inattendue est survenue',
+    details: null
   };
 };
+
+// Services d'authentification
+export const authService = {
+  login: async (credentials) => {
+    const loginData = {
+      username: credentials.identifier, 
+      password: credentials.password
+    };
+    const response = await api.post('/login/', loginData);
+    return response;
+  },
+  
+  register: async (userData) => {
+    const response = await api.post('/register/', userData);
+    return response;
+  },
+  
+  resetPassword: async (data) => {
+    const response = await api.post('/reset-password/', data);
+    return response;
+  },
+  
+  getProfile: async () => {
+    const response = await api.get('/me/');
+    return response;
+  }
+};
+
+// Services des utilisateurs
+export const userService = {
+  getUsers: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/users/', { params: cleanParams });
+    return response;
+  },
+  
+  getUser: async (id) => {
+    const response = await api.get(`/users/${id}/`);
+    return response;
+  }
+};
+
+
+// Services des salles
+export const salleService = {
+  getSalles: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/salles/', { params: cleanParams });
+    return response;
+  },
+  
+  getSalle: async (id) => {
+    const response = await api.get(`/salles/${id}/`);
+    return response;
+  },
+  
+  createSalle: async (data) => {
+    const response = await api.post('/salles/', data);
+    return response;
+  },
+  
+  updateSalle: async (id, data) => {
+    const response = await api.put(`/salles/${id}/`, data);
+    return response;
+  },
+  
+  deleteSalle: async (id) => {
+    const response = await api.delete(`/salles/${id}/`);
+    return response;
+  },
+  
+  getPlanningSalle: async (id, params = {}) => {
+    const response = await api.get(`/salles/${id}/planning/`, { params });
+    return response;
+  }
+};
+
+// Services des matériels
+export const materielService = {
+  getMateriels: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/materiels/', { params: cleanParams });
+    return response;
+  },
+  
+  getMateriel: async (id) => {
+    // Correction : Garder '/api'
+    const response = await api.get(`/materiels/${id}/`);
+    return response;
+  },
+  
+  createMateriel: async (data) => {
+    // Correction : Garder '/api'
+    const response = await api.post('/materiels/', data);
+    return response;
+  },
+  
+  updateMateriel: async (id, data) => {
+    // Correction : Garder '/api'
+    const response = await api.put(`/materiels/${id}/`, data);
+    return response;
+  },
+  
+  deleteMateriel: async (id) => {
+    // Correction : Garder '/api'
+    const response = await api.delete(`/materiels/${id}/`);
+    return response;
+  },
+  
+  getPlanningMateriel: async (id, params = {}) => {
+    // Correction : Garder '/api'
+    const response = await api.get(`/materiels/${id}/planning/`, { params });
+    return response;
+  }
+};
+
+// Services des types de matériel
+export const typeMaterielService = {
+  getTypesMateriels: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/types-materiel/', { params: cleanParams });
+    return response;
+  },
+  
+  createTypeMateriel: async (data) => {
+    const response = await api.post('/types-materiel/', data);
+    return response;
+  }
+};
+
+// Services des formations
+export const formationService = {
+  getFormations: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/formations/', { params: cleanParams });
+    return response;
+  },
+  
+  getFormation: async (id) => {
+    const response = await api.get(`/formations/${id}/`);
+    return response;
+  },
+  
+  createFormation: async (data) => {
+    const response = await api.post('/formations/', data);
+    return response;
+  },
+  
+  updateFormation: async (id, data) => {
+    const response = await api.put(`/formations/${id}/`, data);
+    return response;
+  },
+  
+  deleteFormation: async (id) => {
+    const response = await api.delete(`/formations/${id}/`);
+    return response;
+  }
+};
+
+// Services des créneaux
+export const creneauService = {
+  getCreneaux: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/creneaux/', { params: cleanParams });
+    return response;
+  }
+};
+
+// Services des réservations
+export const reservationService = {
+  // Réservations de salles
+  getReservationsSalles: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/reservations-salles/', { params: cleanParams });
+    return response;
+  },
+  
+  createReservationSalle: async (data) => {
+    const response = await api.post('/reservations-salles/', data);
+    return response;
+  },
+  
+  updateReservationSalle: async (id, data) => {
+    const response = await api.put(`/reservations-salles/${id}/`, data);
+    return response;
+  },
+  
+  deleteReservationSalle: async (id) => {
+    const response = await api.delete(`/reservations-salles/${id}/`);
+    return response;
+  },
+  
+  // Réservations de matériels
+  getReservationsMateriels: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/reservations-materiels/', { params: cleanParams });
+    return response;
+  },
+  
+  createReservationMateriel: async (data) => {
+    const response = await api.post('/reservations-materiels/', data);
+    return response;
+  },
+  
+  updateReservationMateriel: async (id, data) => {
+    const response = await api.put(`/reservations-materiels/${id}/`, data);
+    return response;
+  },
+  
+  deleteReservationMateriel: async (id) => {
+    const response = await api.delete(`/reservations-materiels/${id}/`);
+    return response;
+  },
+  
+  // Mes réservations
+  getMesReservations: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/mes-reservations/', { params: cleanParams });
+    return response;
+  }
+};
+
+// Services du planning
+export const planningService = {
+  getPlanningGeneral: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/planning/', { params: cleanParams });
+    return response;
+  },
+  
+  checkDisponibilite: async (data) => {
+    const response = await api.post('/disponibilite/', data);
+    return response;
+  }
+};
+
+// Services des statistiques
+export const statistiquesService = {
+  getStatistiques: async (params = {}) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const response = await api.get('/statistiques/', { params: cleanParams });
+    return response;
+  }
+};
+
+export default api;

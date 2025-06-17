@@ -15,23 +15,27 @@ const Login = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      const result = await login(data);
-      
-      if (result.success) {
-        toast.success('Connexion réussie !');
-        navigate('/', { replace: true });
-      } else {
-        toast.error(result.error || 'Erreur de connexion');
-      }
-    } catch (error) {
-      console.error('Erreur de connexion:', error);
-      toast.error('Erreur de connexion');
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    const loginData = {
+      identifier: data.identifier, 
+      password: data.password
+    };
+    const result = await login(loginData);
+    
+    if (result.success) {
+      toast.success('Connexion réussie !');
+      navigate('/', { replace: true });
+    } else {
+      toast.error(result.error || 'Erreur de connexion');
     }
-  };
+  } catch (error) {
+    console.error('Erreur de connexion:', error);
+    toast.error('Erreur de connexion');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex">

@@ -77,90 +77,87 @@ const Reservations = () => {
   );
 
   const onSubmit = async (data) => {
-    if (!availabilityResult?.disponible) {
-      toast.error('Veuillez vérifier la disponibilité avant de confirmer');
-      return;
-    }
+  // Correction : Vérifier que la disponibilité a été confirmée
+  if (!availabilityResult?.disponible) {
+    toast.error('Veuillez vérifier la disponibilité avant de confirmer');
+    return;
+  }
 
-    setIsSubmitting(true);
-    try {
-      let result;
-      if (activeTab === 'salle') {
-        result = await reservationService.createReservationSalle({
-          salle: parseInt(data.salle),
-          formation: parseInt(data.formation),
-          creneau: parseInt(data.creneau),
-          date: data.date,
-          sujet: data.sujet,
-          commentaires: data.commentaires || ''
-        });
-      } else {
-        result = await reservationService.createReservationMateriel({
-          materiel: parseInt(data.materiel),
-          formation: parseInt(data.formation),
-          creneau: parseInt(data.creneau),
-          date: data.date,
-          commentaires: data.commentaires || ''
-        });
-      }
-      
-      toast.success(`Réservation de ${activeTab} créée avec succès !`);
-      
-      // Rediriger vers mes réservations avec un délai pour laisser voir le message
-      setTimeout(() => {
-        navigate('/mes-reservations');
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Erreur lors de la création:', error);
-      const errorInfo = handleApiError(error);
-      toast.error(errorInfo.message);
-    } finally {
-      setIsSubmitting(false);
+  setIsSubmitting(true);
+  try {
+    let result;
+    if (activeTab === 'salle') {
+      result = await reservationService.createReservationSalle({
+        salle: parseInt(data.salle),
+        formation: parseInt(data.formation),
+        creneau: parseInt(data.creneau),
+        date: data.date,
+        sujet: data.sujet,
+        commentaires: data.commentaires || ''
+      });
+    } else {
+      result = await reservationService.createReservationMateriel({
+        materiel: parseInt(data.materiel),
+        formation: parseInt(data.formation),
+        creneau: parseInt(data.creneau),
+        date: data.date,
+        commentaires: data.commentaires || ''
+      });
     }
-  };
+    
+    toast.success(`Réservation de ${activeTab} créée avec succès !`);
+    
+    queryClient.invalidateQueries('mes-reservations');
+    queryClient.invalidateQueries('planning');
+    
+    setTimeout(() => {
+      navigate('/mes-reservations');
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Erreur lors de la création:', error);
+    const errorInfo = handleApiError(error);
+    toast.error(errorInfo.message);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const checkAvailability = async () => {
-    if (!watchedValues.date || !watchedValues.creneau || !watchedValues[activeTab]) {
-      toast.error('Veuillez remplir tous les champs requis pour vérifier la disponibilité');
-      return;
-    }
+  if (!watchedValues.date || !watchedValues.creneau || !watchedValues[activeTab]) {
+    toast.error('Veuillez remplir tous les champs requis pour vérifier la disponibilité');
+    return;
+  }
 
-    setCheckingAvailability(true);
-    try {
-      const response = await planningService.checkDisponibilite({
-        type_ressource: activeTab,
-        ressource_id: parseInt(watchedValues[activeTab]),
-        date: watchedValues.date,
-        creneau_id: parseInt(watchedValues.creneau)
-      });
-      
-      setAvailabilityResult(response.data);
-      setShowAvailability(true);
-      
-      if (response.data.disponible) {
-        toast.success('Ressource disponible !');
-      } else {
-        toast.warning('Ressource non disponible');
-      }
-      
-    } catch (error) {
-      console.error('Erreur vérification:', error);
-      const errorInfo = handleApiError(error);
-      toast.error(errorInfo.message);
-      setAvailabilityResult(null);
-      setShowAvailability(false);
-    } finally {
-      setCheckingAvailability(false);
+  setCheckingAvailability(true);
+  try {
+    // Correction : Adapter les paramètres selon votre API
+    const response = await planningService.checkDisponibilite({
+      type_ressource: activeTab,
+      ressource_id: parseInt(watchedValues[activeTab]),
+      date: watchedValues.date,
+      creneau_id: parseInt(watchedValues.creneau)
+    });
+    
+    setAvailabilityResult(response.data);
+    setShowAvailability(true);
+    
+    if (response.data.disponible) {
+      toast.success('Ressource disponible !');
+    } else {
+      toast.warning('Ressource non disponible');
     }
-  };
-
-  const handleTabChange = (newTab) => {
-    setActiveTab(newTab);
-    reset();
-    setShowAvailability(false);
+    
+  } catch (error) {
+    console.error('Erreur vérification:', error);
+    const errorInfo = handleApiError(error);
+    toast.error(errorInfo.message);
     setAvailabilityResult(null);
-  };
+    setShowAvailability(false);
+  } finally {
+    setCheckingAvailability(false);
+  }
+};
 
   const getMinDate = () => {
     return format(new Date(), 'yyyy-MM-dd');
