@@ -51,7 +51,7 @@ const Formations = () => {
   () => userService.getUsers({ user_type: 'enseignant' }),
   {
     select: (response) => response.data.results || response.data,
-    enabled: Boolean(isEnseignant) && (showCreateModal || editingFormation),
+    enabled: Boolean(isEnseignant && (showCreateModal || editingFormation)),
   }
 );
 
