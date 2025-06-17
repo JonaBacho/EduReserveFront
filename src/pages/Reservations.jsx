@@ -1,7 +1,7 @@
 // src/pages/Reservations.jsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Plus, Monitor, Laptop, Calendar, Clock, Check, AlertCircle, Loader, ArrowLeft, Info } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
   creneauService, 
   reservationService, 
   planningService,
+  authService,
   handleApiError 
 } from '../services/api';
 
@@ -23,9 +24,21 @@ const Reservations = () => {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = useForm();
   const watchedValues = watch();
+
+  const { data: userProfile } = useQuery(
+  'user-profile',
+  () => authService.getProfile(),
+  {
+    select: (response) => response.data,
+    onError: (error) => {
+      console.error('Erreur profil:', error);
+    }
+  }
+);
 
   // Charger les données nécessaires
   const { data: formations, isLoading: loadingFormations, error: errorFormations } = useQuery(
@@ -77,9 +90,13 @@ const Reservations = () => {
   );
 
   const onSubmit = async (data) => {
-  // Correction : Vérifier que la disponibilité a été confirmée
   if (!availabilityResult?.disponible) {
     toast.error('Veuillez vérifier la disponibilité avant de confirmer');
+    return;
+  }
+
+  if (!userProfile?.id) {
+    toast.error('Impossible de récupérer les informations utilisateur');
     return;
   }
 
@@ -88,6 +105,7 @@ const Reservations = () => {
     let result;
     if (activeTab === 'salle') {
       result = await reservationService.createReservationSalle({
+        enseignant: userProfile.id, // Ajout de l'ID enseignant
         salle: parseInt(data.salle),
         formation: parseInt(data.formation),
         creneau: parseInt(data.creneau),
@@ -97,6 +115,7 @@ const Reservations = () => {
       });
     } else {
       result = await reservationService.createReservationMateriel({
+        enseignant: userProfile.id, // Ajout de l'ID enseignant
         materiel: parseInt(data.materiel),
         formation: parseInt(data.formation),
         creneau: parseInt(data.creneau),
@@ -106,7 +125,6 @@ const Reservations = () => {
     }
     
     toast.success(`Réservation de ${activeTab} créée avec succès !`);
-    
     queryClient.invalidateQueries('mes-reservations');
     queryClient.invalidateQueries('planning');
     
@@ -128,6 +146,13 @@ const Reservations = () => {
     toast.error('Veuillez remplir tous les champs requis pour vérifier la disponibilité');
     return;
   }
+
+  const handleTabChange = (newTab) => {
+  setActiveTab(newTab);
+  reset();
+  setShowAvailability(false);
+  setAvailabilityResult(null);
+};
 
   setCheckingAvailability(true);
   try {

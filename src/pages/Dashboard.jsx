@@ -55,34 +55,47 @@ const Dashboard = () => {
   );
 
   // Calculer les statistiques rapides
-  const getQuickStats = () => {
-    if (!mesReservations) return { total: 0, aujourdhui: 0, demain: 0, semaine: 0 };
-
-    const aujourdhui = format(new Date(), 'yyyy-MM-dd');
-    const demain = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-    const dansSeptJours = format(addDays(new Date(), 7), 'yyyy-MM-dd');
-
-    const totalSalles = mesReservations.reservations_salles?.length || 0;
-    const totalMateriels = mesReservations.reservations_materiels?.length || 0;
-
-    const toutesReservations = [
-      ...(mesReservations.reservations_salles || []),
-      ...(mesReservations.reservations_materiels || [])
-    ];
-
-    const reservationsAujourdhui = toutesReservations.filter(res => res.date === aujourdhui).length;
-    const reservationsDemain = toutesReservations.filter(res => res.date === demain).length;
-    const reservationsSemaine = toutesReservations.filter(res => 
-      res.date >= aujourdhui && res.date <= dansSeptJours
-    ).length;
-
-    return {
-      total: totalSalles + totalMateriels,
-      aujourdhui: reservationsAujourdhui,
-      demain: reservationsDemain,
-      semaine: reservationsSemaine
-    };
+  // Calculer les statistiques rapides
+const getQuickStats = () => {
+  if (!mesReservations) return { 
+    total: 0, 
+    aujourdhui: 0, 
+    demain: 0, 
+    semaine: 0,
+    heuresEffectuees: 0 // Ajout
   };
+
+  const aujourdhui = format(new Date(), 'yyyy-MM-dd');
+  const demain = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const dansSeptJours = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
+  const totalSalles = mesReservations.reservations_salles?.length || 0;
+  const totalMateriels = mesReservations.reservations_materiels?.length || 0;
+
+  const toutesReservations = [
+    ...(mesReservations.reservations_salles || []),
+    ...(mesReservations.reservations_materiels || [])
+  ];
+
+  const reservationsAujourdhui = toutesReservations.filter(res => res.date === aujourdhui).length;
+  const reservationsDemain = toutesReservations.filter(res => res.date === demain).length;
+  const reservationsSemaine = toutesReservations.filter(res => 
+    res.date >= aujourdhui && res.date <= dansSeptJours
+  ).length;
+
+  // Calcul des heures effectuées (chaque réservation = 2h selon les créneaux)
+  const heuresEffectuees = toutesReservations.filter(res => 
+    isPast(new Date(res.date)) && !isToday(new Date(res.date))
+  ).length * 2; // Ajout du calcul
+
+  return {
+    total: totalSalles + totalMateriels,
+    aujourdhui: reservationsAujourdhui,
+    demain: reservationsDemain,
+    semaine: reservationsSemaine,
+    heuresEffectuees // Ajout
+  };
+};
 
   const stats = getQuickStats();
 

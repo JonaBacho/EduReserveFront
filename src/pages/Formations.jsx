@@ -47,13 +47,13 @@ const Formations = () => {
 
   // Récupérer les enseignants pour le sélecteur de responsable
   const { data: enseignants } = useQuery(
-    'enseignants',
-    () => userService.getUsers({ user_type: 'enseignant' }),
-    {
-      select: (response) => response.data.results || response.data,
-      enabled: isEnseignant && (showCreateModal || editingFormation),
-    }
-  );
+  'enseignants',
+  () => userService.getUsers({ user_type: 'enseignant' }),
+  {
+    select: (response) => response.data.results || response.data,
+    enabled: Boolean(isEnseignant) && (showCreateModal || editingFormation),
+  }
+);
 
   // Mutation pour créer une formation
   const createFormationMutation = useMutation(

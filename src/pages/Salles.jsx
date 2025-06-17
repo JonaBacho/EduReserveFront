@@ -124,16 +124,18 @@ const Salles = () => {
 
   // Statistiques
   const getStats = () => {
-    if (!salles) return { total: 0, petites: 0, moyennes: 0, grandes: 0, totalCapacite: 0 };
-    
-    return {
-      total: salles.length,
-      petites: salles.filter(s => s.capacite <= 20).length,
-      moyennes: salles.filter(s => s.capacite > 20 && s.capacite <= 40).length,
-      grandes: salles.filter(s => s.capacite > 40).length,
-      totalCapacite: salles.reduce((sum, s) => sum + s.capacite, 0)
-    };
+  if (!salles) return { total: 0, disponibles: 0, capaciteTotale: 0, capaciteMoyenne: 0 };
+  
+  const sallesDisponibles = salles.filter(s => s.active);
+  const capaciteTotale = salles.reduce((sum, s) => sum + s.capacite, 0);
+  
+  return {
+    total: salles.length,
+    disponibles: sallesDisponibles.length,
+    capaciteTotale: capaciteTotale,
+    capaciteMoyenne: salles.length > 0 ? Math.round(capaciteTotale / salles.length) : 0
   };
+};
 
   const stats = getStats();
 
