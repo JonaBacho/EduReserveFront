@@ -96,7 +96,7 @@ const Login = () => {
             <div>
               <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-2">
                 <User className="w-4 h-4 inline mr-2" />
-                Nom d'utilisateur ou matricule *
+                Email ou matricule *
               </label>
               <input
                 {...register('identifier', { 
