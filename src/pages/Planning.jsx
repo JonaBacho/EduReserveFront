@@ -18,16 +18,19 @@ const Planning = () => {
 
   // Charger les créneaux horaires
   const { data: creneaux, isLoading: loadingCreneaux, error: errorCreneaux } = useQuery(
-    'creneaux',
-    () => creneauService.getCreneaux(),
-    {
-      select: (response) => response.data.results || response.data,
-      onError: (error) => {
-        console.error('Erreur lors du chargement des créneaux:', error);
-        toast.error('Erreur lors du chargement des créneaux horaires');
-      }
+  'creneaux',
+  () => creneauService.getCreneaux(),
+  {
+    select: (response) => {
+      const data = response.data.results || response.data;
+      return Array.isArray(data) ? data : [];
+    },
+    onError: (error) => {
+      console.error('Erreur lors du chargement des créneaux:', error);
+      toast.error('Erreur lors du chargement des créneaux horaires');
     }
-  );
+  }
+);
 
   // Charger les salles
   const { data: salles, isLoading: loadingSalles, error: errorSalles } = useQuery(
