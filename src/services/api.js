@@ -99,7 +99,7 @@ export const handleApiError = (error) => {
 export const authService = {
   login: async (credentials) => {
     const loginData = {
-      username: credentials.identifier, 
+      identifier: credentials.identifier, 
       password: credentials.password
     };
     const response = await api.post('/login/', loginData);
