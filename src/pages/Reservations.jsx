@@ -89,6 +89,13 @@ const Reservations = () => {
     }
   );
 
+  const handleTabChange = (newTab) => {
+  setActiveTab(newTab);
+  reset();
+  setShowAvailability(false);
+  setAvailabilityResult(null);
+};
+
   const onSubmit = async (data) => {
   if (!availabilityResult?.disponible) {
     toast.error('Veuillez vérifier la disponibilité avant de confirmer');
@@ -146,13 +153,6 @@ const Reservations = () => {
     toast.error('Veuillez remplir tous les champs requis pour vérifier la disponibilité');
     return;
   }
-
-  const handleTabChange = (newTab) => {
-  setActiveTab(newTab);
-  reset();
-  setShowAvailability(false);
-  setAvailabilityResult(null);
-};
 
   setCheckingAvailability(true);
   try {
